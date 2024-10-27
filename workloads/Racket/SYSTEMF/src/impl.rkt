@@ -8,12 +8,10 @@
 (struct TVar (n) #:transparent)
 (struct Arr (t1 t2) #:transparent)
 (struct All (t1 t2) #:transparent)
-; (define typ? (lambda (x) (or (Top? x) (TVar? x) (Arr? x) (All? x))))
 (define (typ? x)
   (match x
     [(Top) #t]
     [(TVar n) (exact-integer? n)]
-    ; [(TVar n) (exact-nonnegative-integer? n)]
     [(Arr t1 t2) (and (typ? t1) (typ? t2))]
     [(All t1 t2) (and (typ? t1) (typ? t2))]
     [_ #f]))
@@ -24,11 +22,9 @@
 (struct App (term1 term2) #:transparent)
 (struct TAbs (typ term) #:transparent)
 (struct TApp (term typ) #:transparent)
-; (define term? (lambda (x) (or (Var? x) (Abs? x) (App? x) (TAbs? x) (TApp? x))))
 (define (term? x)
   (match x
     [(Var n) (exact-integer? n)]
-    ; [(Var n) (exact-nonnegative-integer? n)]
     [(Abs typ term) (and (typ? typ) (term? term))]
     [(App term1 term2) (and (term? term1) (term? term2))]
     [(TAbs typ term) (and (typ? typ) (term? term))]

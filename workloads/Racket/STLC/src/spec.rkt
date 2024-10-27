@@ -1,6 +1,6 @@
 #lang racket
 
-(require "./impl.rkt")
+(require "Impl.rkt")
 (require data/maybe)
 
 (define (assumes p1 p2)
