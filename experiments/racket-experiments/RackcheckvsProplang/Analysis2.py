@@ -119,29 +119,30 @@ def time_sliced_results(
     return results
 
 
-def process_data(results: str, figures: str):
+def process_data(results: str, figures: str, limit_type: str) -> pd.DataFrame:
     df = parse_results(results)
 
     charter = partial(
         time_sliced_results,
         df=df,
         limits=[0.1, 1, 10, 60],
-        limit_type="time",
+        limit_type=limit_type,
         strategies=[
             "ProplangBespoke",
             "RackcheckBespoke",
         ],
     )
     bst = charter(case="BST")
-    # rbt = charter(case="RBT")
-    # stlc = charter(case="STLC")
-
+    rbt = charter(case="RBT")
+    stlc = charter(case="STLC")
+    systemf = charter(case="SYSTEMF")
     bst["workload"] = "BST"
-    # rbt["workload"] = "RBT"
-    # stlc["workload"] = "STLC"
-
-    # df = pd.concat([bst, rbt, stlc])
-    df = pd.concat([bst])
+    rbt["workload"] = "RBT"
+    stlc["workload"] = "STLC"
+    systemf["workload"] = "SYSTEMF"
+    df = pd.concat([bst, rbt, stlc, systemf])
+    print("What")
+    print(df)
     # Turn variable/value into column, where each variable has its own column and value is the value of that column.
     df = df.pivot(
         index=["strategy", "workload"], columns="variable", values="value"
@@ -217,6 +218,7 @@ def plot_data(
         "BST": 53,
         "RBT": 58,
         "STLC": 20,
+        "SYSTEMF": 36,
     }
     # Create a horizontal stacked bar chart with the following constraints:
     # - y-axis is the strategy
@@ -228,8 +230,6 @@ def plot_data(
 
     def luma(r, g, b):
         return 0.299 * r + 0.587 * g + 0.114 * b
-
-    suffix = "time" if limit_type == "time" else "inputs"
 
     vspace = 60
     hspace = 50
@@ -298,7 +298,7 @@ def plot_data(
                 )
             current_x += width_value
 
-    im.save(f"{figures}/{prefix}_{case}_{suffix}.png")
+    im.save(f"{figures}/{prefix}_{case}_{limit_type}.png")
 
 
 if __name__ == "__main__":
@@ -306,8 +306,9 @@ if __name__ == "__main__":
     results_path = f"{filepath}/results"
     images_path = f"{filepath}/figures"
     # analyze(results_path, images_path)
-    df = process_data(results_path, images_path)
+    limit_type = "time"
+    df = process_data(results_path, images_path, limit_type)
     df = pd.read_csv(f"{images_path}/workloads.csv", index_col=False)
-    for case in ["BST"]:
-        plot_data(df, images_path, "time", "task_bucket", case, show_names=False)
-        plot_data(df, images_path, "time", "task_bucket_named", case, show_names=True)
+    for case in ["BST", "RBT", "STLC", "SYSTEMF"]:
+        plot_data(df, images_path, limit_type, "task_bucket", case, show_names=False)
+        plot_data(df, images_path, limit_type, "task_bucket_named", case, show_names=True)

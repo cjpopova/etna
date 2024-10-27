@@ -1,7 +1,7 @@
 #lang racket
 
 (require data/maybe)
-(require "Impl.rkt")
+(require (only-in "Impl.rkt" term? typ? Top TVar Arr All Var Abs App TAbs TApp pstep))
 (require "Type.rkt")
 (require "Util.rkt")
 

@@ -1,6 +1,6 @@
 #lang racket
 
-(require "Impl.rkt")
+(require (only-in "Impl.rkt" term? typ? Top TVar Arr All Var Abs App TAbs TApp pstep/correct))
 (require "Util.rkt")
 (require "Type.rkt")
 (require rackcheck)
@@ -223,13 +223,16 @@
     (gen:bind (gen:exact-typ 4 (Empty))
     (lambda (ty) (gen:exact-term 4 (Empty) ty))))
 
-
+; (for ([i (in-range 10)])
+;   (define start (current-inexact-milliseconds))
+;   (sample gen:term 1)
+;   (displayln (- (current-inexact-milliseconds) start)))
 
 (define/contract (shrink:num n)
   (exact-integer? . -> . (listof exact-integer?))
-  (if (zero? n)
+  (if (<= n 0)
       '()
-      (list (- n 1))))
+      (list (sub1 n))))
 
 ; shrinkType :: Type -> [Type]
 ; shrinkType Base = []
@@ -306,7 +309,6 @@
       [(nothing) #f]
       [(just _) #t])))
 
-
 (define/contract (size term)
   (term? . -> . number?)
   (match term
@@ -327,7 +329,7 @@
               (append
                 (filter (lambda (e^) (well-typed? e^)) (shrink:term^ e))
                 (filter (lambda (e^) (well-typed? e^)) (apply append (map shrink:term^ (shrink:term^ e))))
-                (match (pstep e)
+                (match (pstep/correct e)
                   [(nothing) '()]
                   [(just e^) (if (< (size e^) (size e)) (list e^) '())])
                   ))]))

@@ -48,7 +48,7 @@ class Racket(BenchTool):
             self._shell_command(["raco", "exe", "main.rkt"])
 
     def _run_trial(self, workload_path: str, params: TrialArgs):
-        metric_writer = EtnaCLIStoreWriter()
+        # metric_writer = EtnaCLIStoreWriter()
 
         with self._change_dir(workload_path):
             cmd = ["./main", params.property, params.strategy]
@@ -81,18 +81,29 @@ class Racket(BenchTool):
                     end = datasource.find("|]")
                     result = datasource[start + 2 : end]
                     self._log(f"{params.strategy} Result: {result}", LogLevel.INFO)
-                    json_result = json.loads(result)
-                    trial_result["foundbug"] = json_result["foundbug"]
-                    trial_result["discards"] = 0  # todo: fix this
-                    trial_result["passed"] = json_result["passed"]
-                    if "time" in json_result:
-                        trial_result["time"] = (
-                            json_result["time"] * 0.001
-                        )  # ms as string to seconds as float conversion
-                    else:
-                        trial_result["time"] = (json_result["search-time"] + json_result["shrink-time"]) * 0.001
-                        trial_result["search-time"] = json_result["search-time"] * 0.001
-                        trial_result["shrink-time"] = json_result["shrink-time"] * 0.001
+                    try:
+                        json_result = json.loads(result)
+                        trial_result["foundbug"] = json_result["foundbug"]
+                        trial_result["discards"] = 0  # todo: fix this
+                        trial_result["passed"] = json_result["passed"]
+                        if "time" in json_result:
+                            trial_result["time"] = (
+                                json_result["time"] * 0.001
+                            )  # ms as string to seconds as float conversion
+                        else:
+                            trial_result["time"] = (json_result["search-time"] + json_result["shrink-time"]) * 0.001
+                            trial_result["search-time"] = json_result["search-time"] * 0.001
+                            trial_result["shrink-time"] = json_result["shrink-time"] * 0.001
+
+                        trial_result["counterexample"] = json_result.get("counterexample", None)
+                        trial_result["shrinked-counterexample"] = json_result.get("shrinked-counterexample", None)
+                        
+                    except json.JSONDecodeError:
+                        trial_result["foundbug"] = False
+                        trial_result["discards"] = -1
+                        trial_result["passed"] = -1
+                        trial_result["time"] = params.timeout
+                        self._log(f"({params.strategy}) Error: {result}", LogLevel.ERROR)
 
                 except subprocess.TimeoutExpired:
                     process.kill()
@@ -104,7 +115,7 @@ class Racket(BenchTool):
                     self._log(f"{params.strategy} Result: Timeout", LogLevel.INFO)
 
                 results.append(trial_result)
-                metric_writer.write(params.experiment_id, trial_result)
+                # metric_writer.write(params.experiment_id, trial_result)
 
                 if params.short_circuit and trial_result["time"] == params.timeout:
                     break

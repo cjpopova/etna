@@ -12,7 +12,7 @@ def collect(results: str):
 
     for workload in tool.all_workloads():
         tool._log(f'Collecting {workload.name}...', logging.INFO)
-        if workload.name in ['SYSTEMF']:
+        if workload.name in ['SYSTEMF', 'BST', 'RBT', 'STLC']:
             for variant in tool.all_variants(workload):
                 tool._log(f'Collecting {workload.name} {variant.name}...', logging.INFO)
                 run_trial = None
@@ -46,7 +46,7 @@ def collect(results: str):
                                     build_common=False,
                                     build_strategies=True,
                                     build_fuzzers=False,
-                                    no_base=False,
+                                    no_base=True,
                                 ))
 
                         tool._log(f'Running {workload.name} {variant.name} {strategy.name} {property}...', logging.INFO)

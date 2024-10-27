@@ -2,8 +2,7 @@
 
 (require data/maybe)
 (require data/monad)
-(require racket/trace)
-(require "Impl.rkt")
+(require (only-in "Impl.rkt" term? typ? Top TVar Arr All Var Abs App TAbs TApp tsubst/correct))
 (require "Util.rkt")
 
 #| type |#
@@ -94,7 +93,7 @@
        (match (promote-TVar fuel e ty1)
          [(just (All ty11 ty12))
             (if (sub-check fuel e ty2 ty11)
-                (just (tsubst ty12 0 ty2))
+                (just (tsubst/correct ty12 0 ty2))
                 (nothing))]
          [_ (nothing)]
          ))]

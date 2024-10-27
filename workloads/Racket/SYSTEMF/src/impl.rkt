@@ -2,7 +2,6 @@
 
 (require data/maybe)
 (require data/monad)
-(require racket/trace)
 
 ; Typ := Top | TVar Nat | Arr Typ Typ | All Typ Typ
 (struct Top () #:transparent)
@@ -13,7 +12,8 @@
 (define (typ? x)
   (match x
     [(Top) #t]
-    [(TVar n) (exact-nonnegative-integer? n)]
+    [(TVar n) (exact-integer? n)]
+    ; [(TVar n) (exact-nonnegative-integer? n)]
     [(Arr t1 t2) (and (typ? t1) (typ? t2))]
     [(All t1 t2) (and (typ? t1) (typ? t2))]
     [_ #f]))
@@ -27,7 +27,8 @@
 ; (define term? (lambda (x) (or (Var? x) (Abs? x) (App? x) (TAbs? x) (TApp? x))))
 (define (term? x)
   (match x
-    [(Var n) (exact-nonnegative-integer? n)]
+    [(Var n) (exact-integer? n)]
+    ; [(Var n) (exact-nonnegative-integer? n)]
     [(Abs typ term) (and (typ? typ) (term? term))]
     [(App term1 term2) (and (term? term1) (term? term2))]
     [(TAbs typ term) (and (typ? typ) (term? term))]
@@ -61,6 +62,17 @@
         )]
     )
 )
+
+
+(define/contract (tshift/correct x typ)
+(number? typ? . -> . typ?)
+    (match typ
+        [(Top) (Top)]
+        [(TVar y) (if (<= x y) (TVar (+ 1 y)) (TVar y))]
+        [(Arr ty1 ty2) (Arr (tshift/correct x ty1) (tshift/correct x ty2))]
+        [(All ty1 ty2) (All (tshift/correct x ty1) (tshift/correct (+ 1 x) ty2))]))
+
+
 
 (define/contract (shift x term)
 (number? term? . -> . term?)
@@ -115,27 +127,27 @@
                     [(< y x) (TVar y)]
                     [(= y x) ty_prime]
                     [else (TVar (- y 1))]
-                   #|!! tsubst_tvar_flip |#
-                   #|! 
+                    #|!! tsubst_tvar_flip |#
+                    #|! 
                         cond
                         [(< y x) (TVar (- y 1))]
                         [(= y x) ty_prime]
                         [else (TVar y)]
-                   |#
-                   #|!! tsubst_tvar_no_shift |#
-                   #|! 
+                    |#
+                    #|!! tsubst_tvar_no_shift |#
+                    #|! 
                         cond
                         [(< y x) (TVar y)]
                         [(= y x) ty_prime]
                         [else (TVar y)]
-                   |#
-                   #|!! tsubst_tvar_over_shift |#
-                   #|! 
+                    |#
+                    #|!! tsubst_tvar_over_shift |#
+                    #|! 
                         cond
                         [(< y x) (TVar (- y 1))]
                         [(= y x) ty_prime]
                         [else (TVar (- y 1))]
-                   |#
+                    |#
         )]
         [(Arr ty1 ty2) (Arr (tsubst ty1 x ty_prime) (tsubst ty2 x ty_prime))]
         [(All ty1 ty2) (#|! |#
@@ -147,6 +159,18 @@
         )]
     )
 )
+
+
+(define/contract (tsubst/correct ty x ty_prime)
+(typ? number? typ? . -> . typ?)
+    (match ty 
+        [(Top) (Top)]
+        [(TVar y) (cond
+                    [(< y x) (TVar y)]
+                    [(= y x) ty_prime]
+                    [else (TVar (- y 1))])]
+        [(Arr ty1 ty2) (Arr (tsubst/correct ty1 x ty_prime) (tsubst/correct ty2 x ty_prime))]
+        [(All ty1 ty2) (All (tsubst/correct ty1 x ty_prime) (tsubst/correct ty2 (+ 1 x) (tshift 0 ty_prime)))]))
 
 (define/contract (subst term x t-prime)
 (term? number? term? . -> . term?)
@@ -195,6 +219,19 @@
     )
 )
 
+(define/contract (subst/correct term x t-prime)
+(term? number? term? . -> . term?)
+    (match term
+        [(Var y) (cond 
+                  [(< y x) (Var y)]
+                  [(= y x) t-prime]
+                  [else (Var (- y 1))])]
+        [(Abs ty1 t2) (Abs ty1 (subst/correct t2 (+ 1 x) (shift 0 t-prime)))] 
+        [(App t1 t2) (App (subst/correct t1 x t-prime) (subst/correct t2 x t-prime))]
+        [(TAbs ty1 t2) (TAbs ty1 (subst/correct t2 x (shift-typ 0 t-prime)))]
+        [(TApp t1 ty2) (TApp (subst/correct t1 x t-prime) ty2)]))
+
+
 (define/contract (subst-typ term x ty)
 (term? number? typ? . -> . term?)
     (match term
@@ -215,6 +252,18 @@
         [(TApp t1 ty2) (TApp (subst-typ t1 x ty) (tsubst ty2 x ty))]
     )
 )
+
+(define/contract (subst-typ/correct term x ty)
+(term? number? typ? . -> . term?)
+    (match term
+        [(Var n) (Var n)]
+        [(Abs ty1 t2) (Abs (tsubst/correct ty1 x ty) (subst-typ/correct t2 x ty))]
+        [(App t1 t2) (App (subst-typ/correct t1 x ty) (subst-typ/correct t2 x ty))]
+        [(TAbs ty1 t2) (TAbs (tsubst/correct ty1 x ty) (subst-typ/correct t2 (+ 1 x) (tshift/correct 0 ty)))]
+        [(TApp t1 ty2) (TApp (subst-typ/correct t1 x ty) (tsubst/correct ty2 x ty))]
+    )
+)
+
 
 #| stepping |#
 
@@ -239,6 +288,29 @@
         [_ nothing]
     )
 )
+
+(define/contract (pstep/correct term)
+(term? . -> . (maybe/c term?))
+    (match term
+        [(Abs ty t) (do [t-prime <- (pstep/correct t)] (just (Abs ty t-prime)))]
+        [(App (Abs _ t1) t2) (let* ([t1-prime (from-just t1 (pstep/correct t1))]
+                                    [t2-prime (from-just t2 (pstep/correct t2))])
+                                    (just (subst/correct t1-prime 0 t2-prime)))]
+        [(App t1 t2) (let* ([t1-res (pstep/correct t1)]
+                            [t2-res (pstep/correct t2)])
+                        (match (list t1-res t2-res)
+                            [(list nothing nothing) nothing]
+                            [(list mt1 mt2) (let* ([t1-prime (from-just t1 t1-res)]
+                                                   [t2-prime (from-just t2 t2-res)])
+                                                    (just (App t1-prime t2-prime)))]))]
+        [(TAbs ty t) (do [t-prime <- (pstep/correct t)] (just (TAbs ty t-prime)))]
+        [(TApp (TAbs _ t) ty) (let* ([t-prime (from-just t (pstep/correct t))])
+                                    (just (subst-typ/correct t-prime 0 ty)))]
+        [(TApp t ty) (do [t-prime <- (pstep/correct t)] (just (TApp t-prime ty)))] 
+        [_ nothing]
+    )
+)
+
 
 ; (trace tshift)
 ; (trace shift)
@@ -265,10 +337,13 @@
     All
 
     tshift
+    tshift/correct
     shift
     shift-typ
     tsubst
+    tsubst/correct
     subst
     subst-typ
     pstep
+    pstep/correct
 )

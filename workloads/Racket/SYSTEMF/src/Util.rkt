@@ -2,7 +2,7 @@
 
 (require data/maybe)
 (require racket/trace)
-(require "Impl.rkt")
+(require (only-in "Impl.rkt" term? typ? Top TVar Arr All Var Abs App TAbs TApp  tshift/correct))
 
 ; Env := Empty | EVar Env Typ | EBound Env Typ
 (struct Empty () #:transparent)
@@ -21,7 +21,7 @@
             (match (match x
                     [0 (just ty)]
                     [_ (get-bound e-prime (- x 1))])
-                [(just ty) (just (tshift 0 ty))]
+                [(just ty) (just (tshift/correct 0 ty))]
                 [(nothing) (nothing)]
             )
         ]
@@ -34,7 +34,7 @@
     (match e
         [(Empty) (nothing)]
         [(EBound e-prime _) (match (get-var e-prime x)
-                                [(just ty) (just (tshift 0 ty))]
+                                [(just ty) (just (tshift/correct 0 ty))]
                                 [(nothing) (nothing)]
                             )]
         [(EVar e-prime ty) (match x

@@ -45,3 +45,5 @@ old_data/
 old/
 
 etna/
+
+**/*.log

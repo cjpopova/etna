@@ -8,8 +8,9 @@
 
 (define (run-generator g sz) (shrink-tree-val (g (current-pseudo-random-generator) sz)))
 
-(require "../src/proplang.rkt")
-(require "../src/shrinking.rkt")
+; (require "../src/proplang.rkt")
+; (require "../src/shrinking.rkt")
+(require property-language)
 
 (define (run-generators generators n)
   (let ([result (make-hash)]
@@ -46,18 +47,18 @@
               [(fail) (set! foundbug #t) (set! counterexample env)]
               [(pass) (set! passed (+ 1 passed)) (loop (+ n 1)) ]
               [(discard) (set! discards (+ 1 discards)) (loop (+ n 1))]))))
-    (run-result (- (current-inexact-milliseconds) start) -1 foundbug passed discards counterexample "")))
+    (run-result (- (current-inexact-milliseconds) start) -1 foundbug passed discards counterexample #f)))
 
 (define (shrinking-run-loop tests p generators shrinkers)
   (let ([result (run-loop tests p generators)])
     (if (run-result-foundbug result)
         (begin
-          (displayln "Found bug, shrinking...") (run-result-counterexample result)
           (letrec (
             [start (current-inexact-milliseconds)]
-            [shrink-result (shrink-eager p shrinkers (run-result-counterexample result))])
+            [shrink-result (shrink-eager p shrinkers (run-result-counterexample result))]
+            [search-time (- (current-inexact-milliseconds) start)])
             (displayln (run-result->json-str (run-result (run-result-search-time result)
-                                              (- (current-inexact-milliseconds) start)
+                                              search-time
                                              (run-result-foundbug result)  
                                              (run-result-passed result)
                                              (run-result-discards result)
