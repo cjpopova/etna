@@ -59,6 +59,11 @@ Please see `DOCUMENTATION.md` to learn more about these details.
    `etna` branch, and follow the instructions for installing from
    source, including `make install` and `make install-fuzz`.
 
+### Racket
+1. Racket version ??? (cjpopova: 8.9 works)
+2. rao pkg install rackcheck-lib
+3. raco pkg install https://github.com/laelath/proplang-racket.git
+
 ### Experiment Reproduction
 
 **Start here if you're in the VM.**

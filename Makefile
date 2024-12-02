@@ -35,6 +35,10 @@ collect4.3:
 analyze4.3:
 	python3 experiments/haskell-experiments/4.3/Analysis.py --data=$(DATA)/4.3 --original=$(DATA)/4.1
 
+collectRacket:
+	mkdir -p $(DATA)/Racket
+	python3 experiments/racket-experiments/RackcheckvsProplang/Collect.py --data=$(DATA)/Racket
+
 switchnew:
 	git -C ../QuickChick switch etna
 	make -C ../QuickChick clean
