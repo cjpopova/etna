@@ -8,6 +8,8 @@
 (struct TVar (n) #:transparent)
 (struct Arr (t1 t2) #:transparent)
 (struct All (t1 t2) #:transparent)
+
+; Predicate contract
 (define (typ? x)
   (match x
     [(Top) #t]
@@ -15,6 +17,12 @@
     [(Arr t1 t2) (and (typ? t1) (typ? t2))]
     [(All t1 t2) (and (typ? t1) (typ? t2))]
     [_ #f]))
+; Combinator contract
+(define (typ/c)
+  (or/c (struct/c Top) #;Top?
+        (struct/c TVar exact-integer?)
+        (struct/dc Arr [t1 () #:lazy (typ/c)] [t2 () #:lazy (typ/c)])
+        (struct/dc All [t1 () #:lazy (typ/c)] [t2 () #:lazy (typ/c)])))
 
 ; Term := Var Nat | Abs Typ Term | App Term Term | TAbs Typ Term | TApp Term Typ
 (struct Var (n) #:transparent)
@@ -31,10 +39,17 @@
     [(TApp term typ) (and (term? term) (typ? typ))]
     [_ #f]))
 
+(define (term/c)
+  (or/c (struct/c Var exact-integer?)
+        (struct/dc Abs [typ () #:lazy (typ/c)] [term () #:lazy (term/c)])
+        (struct/dc App [term1 () #:lazy (term/c)] [term2 () #:lazy (term/c)])
+        (struct/dc TAbs [typ () #:lazy (typ/c)] [term () #:lazy (term/c)])
+        (struct/dc TApp [term () #:lazy (term/c)] [typ () #:lazy (typ/c)])))
+
 #| shifting and substitution |#
 
 (define/contract (tshift x typ)
-(number? typ? . -> . typ?)
+(real? (typ/c) . -> . (typ/c))
     (match typ
         [(Top) (Top)]
         [(TVar y) (#|! |#
@@ -61,7 +76,7 @@
 
 
 (define/contract (tshift/correct x typ)
-(number? typ? . -> . typ?)
+(real? (typ/c) . -> . (typ/c))
     (match typ
         [(Top) (Top)]
         [(TVar y) (if (<= x y) (TVar (+ 1 y)) (TVar y))]
@@ -71,7 +86,7 @@
 
 
 (define/contract (shift x term)
-(number? term? . -> . term?)
+(real? (term/c) . -> . (term/c))
     (match term
         [(Var y) (#|! |#
                   if (<= x y) (Var (+ 1 y)) (Var y)
@@ -98,7 +113,7 @@
 )
 
 (define/contract (shift-typ x term)
-(number? term? . -> . term?)
+(real? (term/c) . -> . (term/c))
     (match term
         [(Var n) (Var n)]
         [(Abs ty1 t2) (Abs (tshift x ty1) (shift-typ x t2))]
@@ -115,7 +130,7 @@
 )
 
 (define/contract (tsubst ty x ty_prime)
-(typ? number? typ? . -> . typ?)
+((typ/c) real? (typ/c) . -> . (typ/c))
     (match ty 
         [(Top) (Top)]
         [(TVar y) (#|! |#
@@ -158,7 +173,7 @@
 
 
 (define/contract (tsubst/correct ty x ty_prime)
-(typ? number? typ? . -> . typ?)
+((typ/c) real? (typ/c) . -> . (typ/c))
     (match ty 
         [(Top) (Top)]
         [(TVar y) (cond
@@ -169,7 +184,7 @@
         [(All ty1 ty2) (All (tsubst/correct ty1 x ty_prime) (tsubst/correct ty2 (+ 1 x) (tshift 0 ty_prime)))]))
 
 (define/contract (subst term x t-prime)
-(term? number? term? . -> . term?)
+((term/c) real? (term/c) . -> . (term/c))
     (match term
         [(Var y) (#|! |#
                   cond 
@@ -216,7 +231,7 @@
 )
 
 (define/contract (subst/correct term x t-prime)
-(term? number? term? . -> . term?)
+((term/c) real? (term/c) . -> . (term/c))
     (match term
         [(Var y) (cond 
                   [(< y x) (Var y)]
@@ -229,7 +244,7 @@
 
 
 (define/contract (subst-typ term x ty)
-(term? number? typ? . -> . term?)
+((term/c) real? (typ/c) . -> . (term/c))
     (match term
         [(Var n) (Var n)] #| not sure about the matching here |#
         [(Abs ty1 t2) (Abs (tsubst ty1 x ty) (subst-typ t2 x ty))]
@@ -250,7 +265,7 @@
 )
 
 (define/contract (subst-typ/correct term x ty)
-(term? number? typ? . -> . term?)
+((term/c) real? (typ/c) . -> . (term/c))
     (match term
         [(Var n) (Var n)]
         [(Abs ty1 t2) (Abs (tsubst/correct ty1 x ty) (subst-typ/correct t2 x ty))]
@@ -264,7 +279,7 @@
 #| stepping |#
 
 (define/contract (pstep term)
-(term? . -> . (maybe/c term?))
+((term/c) . -> . (maybe/c (term/c)))
     (match term
         [(Abs ty t) (do [t-prime <- (pstep t)] (just (Abs ty t-prime)))]
         [(App (Abs _ t1) t2) (let* ([t1-prime (from-just t1 (pstep t1))]
@@ -286,7 +301,7 @@
 )
 
 (define/contract (pstep/correct term)
-(term? . -> . (maybe/c term?))
+((term/c) . -> . (maybe/c (term/c)))
     (match term
         [(Abs ty t) (do [t-prime <- (pstep/correct t)] (just (Abs ty t-prime)))]
         [(App (Abs _ t1) t2) (let* ([t1-prime (from-just t1 (pstep/correct t1))]
